@@ -1,0 +1,5 @@
+hexagon 100 20 1 -2 true 50 0 0 0 500 true 0 255 0
+rect 100 20 2 -1 false 80 50 255 0 255 1000 true 0 0 0
+oval 200 20 2 3 true 50 80 80 80 80 1500 true 0 255 255
+circle 220 120 0 3 false 80 0 0 255 2000 false 0 0 0
+square 20 120 -1 2 true 50 0 0 0 2500 false 0 0 0
