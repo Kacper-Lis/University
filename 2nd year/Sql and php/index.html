@@ -1,0 +1,132 @@
+<img src="amazon_topbanner.png" /> <br>
+
+ <?php
+ # This is to stop PHP from showing an error when $_POST["uid"] is check to have a value.
+ error_reporting (E_ALL ^ E_NOTICE);
+
+ # Opening a connetion to the database
+ require_once("dbconnect.php");
+
+ # Function that converts a rating to a number of stars
+ # I.e. 4 -> ****
+ function intToStars ($rating) {
+ $result = "";
+ while($rating > 0.4) {
+ $result = $result."*";
+ $rating -= 1;
+ }
+ return $result;
+ }
+
+ # Checking to see if this page has been called with a POST request
+ if (!$_POST["uid"]) {
+ # If no request show nothing between banners
+ } else {
+ $user = $_POST["uid"];
+ $query = "
+ SELECT users.UserID, country, orders2.numberOfOrders, orders2.bookcount
+ FROM users, (
+ SELECT UserID, sum(trans.Quantity) as bookcount, count(DISTINCT orders.OrderID) as
+numberOfOrders
+ FROM orders, trans
+ WHERE orders.OrderID = trans.OrderID
+ GROUP BY UserID) as orders2
+ WHERE users.UserID = orders2.UserID AND users.UserID = '$user'
+ GROUP BY users.UserID, country, orders2.bookcount, orders2.numberOfOrders";
+ $result = mysqli_query($conn, $query);
+ $userDetails = mysqli_fetch_array($result);
+ ?>
+
+ <table>
+ <tr>
+ <th> User Details:</th>
+ <th> Orders Summary:</th>
+ </tr>
+ <tr>
+ <td> UserID: <?php echo($userDetails["UserID"])?> <br>
+ Country: <?php echo($userDetails["country"])?> </td>
+ <td> <?php echo($userDetails["numberOfOrders"])?> orders placed <br>
+ <?php echo($userDetails["bookcount"])?> books bought </td>
+ </tr>
+ </table>
+ <?php
+ $query2 = "
+ SELECT orders.Year, orders.totalpay, orders.totalpay - sum(trans.Quantity *
+books.Unitprice) as refund,
+ orders.orderID
+ FROM orders, trans, books
+ WHERE books.ISBN = trans.ISBN and orders.OrderID = trans.OrderID AND orders.UserID = '
+$user'
+ group by orders.OrderID, orders.totalpay, orders.Year
+ ORDER BY orders.Year DESC;";
+
+ $orders = mysqli_query($conn, $query2);
+ # For each order the user has made
+ while($row = mysqli_fetch_array($orders)) {
+ $orderNumber = $row["orderID"];
+ # Give details about this order
+ echo("<table><tr><th> Order Placed </th><th> Total </th> <th>");
+ # Decide if discount or refund should be shown
+ if ($row["refund"] < 0) {
+ echo("Discount");
+ } elseif ($row["refund"] > 0) {
+ echo("Refund");
+ }
+ echo("</th><th> OrderID </th></tr>");
+ echo("<tr><td>".$row["Year"]."</td> <td>£".$row["totalpay"]."</td> <td>");
+
+ if ($row["refund"] < 0) {
+ echo("£".(0-$row["refund"]));
+ } else if ($row["refund"] > 0) {
+ echo("£".$row["refund"]);
+ }
+ echo("</td><td>".$row["orderID"]."</td></tr></table>");
+
+ $getBooks = "
+ select books.ISBN, books.Title, books.Author, books.Year, books.Publisher,
+books.ImageURL,
+ books.Genre, books.Unitprice, trans.Quantity
+ From books, bookratings, trans
+ Where trans.ISBN = books.ISBN and trans.OrderID = '$orderNumber'
+ Group by books.ISBN, books.Title, books.Author, books.Year, books.Publisher,
+books.ImageURL,
+ books.Genre, books.Unitprice, trans.OrderID, trans.Quantity
+ Order By books.Genre ASC";
+ $books = mysqli_query($conn, $getBooks);
+ echo("<table>");
+ # For each book in this order
+ while ($book = mysqli_fetch_array($books)) {
+ echo("<tr><td> <img src=\"".$book["ImageURL"]."img_girl.jpg\" height=\"100\"> ".
+"<td\> <td>");
+ if ($book["Quantity"] > 1) {
+ echo($book["Quantity"]." of ");
+ }
+ $bookISBN = $book["ISBN"];
+ $getRatings = "
+ SELECT avg(Rating) as AvgRating, books.ISBN
+ From books, bookratings
+ where books.ISBN = bookratings.ISBN AND books.ISBN = '$bookISBN'
+ group by books.ISBN";
+
+ $rating = mysqli_query($conn, $getRatings);
+ $thisRating = mysqli_fetch_array($rating);
+
+ echo($book["Title"]."<br>");
+ echo($book["ISBN"]."<br>");
+ echo("£".($book["Unitprice"])."<br>");
+ echo(intToStars($thisRating["AvgRating"])."<br\><td\>");
+ echo("<td>".$book["Genre"]."<td\>");
+ echo("<td>£".($book["Unitprice"] * $book["Quantity"])."<td\>");
+
+ }
+ echo("</table>");
+ }
+ }
+ ?>
+
+ <img src="amazon_bottombanner.png" />
+ <br>
+ <form action="amazon.php" method="post">
+ <b>Query</b> UserID: <input type="text" name="uid">
+ <input type="submit">
+ </form>
